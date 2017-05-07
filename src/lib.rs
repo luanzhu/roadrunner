@@ -123,9 +123,11 @@ use flate2::read::{GzDecoder, ZlibDecoder};
 use encoding::Encoding;
 
 const DNS_THREAD_COUNT: usize = 4;
-const CHROME_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_3) \
+
+pub const DEFAULT_USER_AGENT: &str = "Roadrunner (a rust rest client) v0.1.0";
+pub const CHROME_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_3) \
 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.81 Safari/537.36";
-const FIREFOX_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.12; rv:53.0) \
+pub const FIREFOX_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.12; rv:53.0) \
 Gecko/20100101 Firefox/53.0";
 
 pub struct RestClient {
@@ -274,6 +276,14 @@ impl RestClient {
         self
     }
 
+    fn user_agent<K>(mut self, agent: K) -> Self
+        where K: Into<Cow<'static, str>> {
+
+        self.request.headers_mut().set(hyper::header::UserAgent::new(agent));
+
+        self
+    }
+
     fn execute_on(mut self, core: &mut Core) -> Result<Response, Error> {
         self.request.headers_mut().set(self.cookie);
 
@@ -314,6 +324,16 @@ impl RestClient {
             None => {},
         }
 
+        match self.request.headers().get::<hyper::header::UserAgent>() {
+            Some(_) => {},
+            None => {
+                debug!("Setting user agent to default for {}", self.request.uri());
+                self.request
+                    .headers_mut()
+                    .set(UserAgent::new(DEFAULT_USER_AGENT));
+            },
+        }
+
         request_for_response(self.request, core)
     }
 }
@@ -340,6 +360,11 @@ pub trait RestClientMethods {
     fn json_body_str(self, json_string: String) -> Self;
     fn json_body_typed<T>(self, typed_value: &T) -> Self
         where T: serde::Serialize;
+
+    fn user_agent<K>(self, agent: K) -> Self
+        where K: Into<Cow<'static, str>>;
+    fn user_agent_firefox(self) -> Self;
+    fn user_agent_chrome(self) -> Self;
 
     fn execute_on(self, core: &mut Core) -> Result<Response, Error>;
 }
@@ -398,6 +423,20 @@ impl RestClientMethods for Result<RestClient, Error> {
         serde_json::to_string(typed_value)
             .map_err(Error::JsonError)
             .and_then(|s| { self.json_body_str(s) })
+    }
+
+    fn user_agent<K>(self, agent: K) -> Self
+        where K: Into<Cow<'static, str>> {
+
+        self.map(|client| { client.user_agent(agent) })
+    }
+
+    fn user_agent_firefox(self) -> Self {
+        self.user_agent(FIREFOX_USER_AGENT)
+    }
+
+    fn user_agent_chrome(self) -> Self {
+        self.user_agent(CHROME_USER_AGENT)
     }
 
     fn execute_on(self, core: &mut Core) -> Result<Response, Error> {
@@ -546,11 +585,6 @@ pub fn request_for_response(request: hyper::client::Request, core: &mut Core) ->
                                  qitem(HyperEncoding::Deflate),
                                  qitem(HyperEncoding::Chunked),
                                  qitem(HyperEncoding::Identity)]));
-
-    debug!("Setting user agent to default firefox for request {}", request.uri());
-    request
-        .headers_mut()
-        .set(UserAgent::new(FIREFOX_USER_AGENT));
 
     let request = request;
 

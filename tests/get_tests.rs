@@ -30,6 +30,58 @@ fn setup() {
 }
 
 #[test]
+fn rest_client_custom_user_agent_test() {
+    setup();
+
+    let mut core = tokio_core::reactor::Core::new().unwrap();
+
+    let custom_agent = "Custom User Agent 1";
+
+    let response = RestClient::get(&httpbin::to_full_http_url("/get"))
+        .query_param("foo", "bar1")
+        .query_param("foo", "bar2")
+        .user_agent(custom_agent)
+        .execute_on(&mut core)
+        .unwrap();
+
+    println!("{:?}", response);
+
+    assert_eq!(*response.status(), StatusCode::Ok);
+
+    let json_value = response.content().as_value().unwrap();
+    assert_eq!(Value::Array(vec![Value::String("bar1".to_string()),
+                                 Value::String("bar2".to_owned())]), json_value["args"]["foo"]);
+
+    assert_eq!(Value::String(custom_agent.to_owned()),
+                json_value["headers"]["User-Agent"]);
+}
+
+#[test]
+fn rest_client_firefox_user_agent_test() {
+    setup();
+
+    let mut core = tokio_core::reactor::Core::new().unwrap();
+
+    let response = RestClient::get(&httpbin::to_full_http_url("/get"))
+        .query_param("foo", "bar1")
+        .query_param("foo", "bar2")
+        .user_agent_firefox()
+        .execute_on(&mut core)
+        .unwrap();
+
+    println!("{:?}", response);
+
+    assert_eq!(*response.status(), StatusCode::Ok);
+
+    let json_value = response.content().as_value().unwrap();
+    assert_eq!(Value::Array(vec![Value::String("bar1".to_string()),
+                                 Value::String("bar2".to_owned())]), json_value["args"]["foo"]);
+
+    assert_eq!(Value::String(roadrunner::FIREFOX_USER_AGENT.to_owned()),
+                json_value["headers"]["User-Agent"]);
+}
+
+#[test]
 fn rest_client_query_param_multi_value_test() {
     setup();
 
@@ -49,6 +101,9 @@ fn rest_client_query_param_multi_value_test() {
     let json_value = response.content().as_value().unwrap();
     assert_eq!(Value::Array(vec![Value::String("bar1".to_string()),
                                  Value::String("bar2".to_owned())]), json_value["args"]["foo"]);
+
+    assert_eq!(Value::String(roadrunner::DEFAULT_USER_AGENT.to_owned()),
+                json_value["headers"]["User-Agent"]);
 }
 
 #[test]
