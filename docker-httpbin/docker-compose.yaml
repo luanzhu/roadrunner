@@ -1,0 +1,16 @@
+version: "2"
+services:
+  httpbin:
+    image: citizenstig/httpbin
+
+  nginx:
+    image: nginx
+    depends_on:
+      - httpbin
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./config/localhost.key:/etc/nginx/conf.d/localhost.key
+      - ./config/localhost.cert:/etc/nginx/conf.d/localhost.cert
+    ports:
+      - "8000:80"
+      - "8001:443"
