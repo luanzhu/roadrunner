@@ -2,6 +2,10 @@
 name = "roadrunner"
 version = "0.1.0"
 authors = ["Yanhao Zhu <yanhaozhu@gmail.com>"]
+description = "A rust rest client based on hyper"
+repository = "https://github.com/luanzhu/roadrunner"
+keywords = ["rest", "client", "hyper"]
+categories = ["web-programming", "web-programming::http-client"]
 
 [dependencies]
 hyper = { git = "https://github.com/hyperium/hyper", branch = "master" }
