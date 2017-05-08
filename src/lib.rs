@@ -668,7 +668,6 @@ pub fn request_for_response(request: hyper::client::Request, core: &mut Core) ->
             let content_encoding = headers.get::<ContentEncoding>().map(|enc| enc.clone());
 
             let content_type = headers.get::<ContentType>().map(|c| c.clone());
-            println!("{:?}", content_type);
 
             res.body()
                 .fold(Vec::new(), |mut v, chunk| {
