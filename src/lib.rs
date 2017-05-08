@@ -1,3 +1,5 @@
+#![deny(missing_docs)]
+
 //! # Roadrunner (RR)
 //!
 //! Roadrunner is a rust rest client based on [hyper project](https://github.com/hyperium/hyper) to
@@ -32,7 +34,7 @@
 //! 
 //!     let original_typed = Address {
 //!         street: "135 College View Ave.".to_owned(),
-//!         city: "Greenville".to_owned(),
+//!         city: "San Francisco".to_owned(),
 //!     };
 //!
 //!     let response = RestClient::post("http://mockbin.com/request")
@@ -124,12 +126,19 @@ use encoding::Encoding;
 
 const DNS_THREAD_COUNT: usize = 4;
 
+/// Default user agent will be sent with request if user agent is not specified.
 pub const DEFAULT_USER_AGENT: &str = "Roadrunner (a rust rest client) v0.1.0";
+/// The user agent is used when `user_agent_chrome` is called.
 pub const CHROME_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_3) \
 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.81 Safari/537.36";
+/// The user agent is used when `user_agent_firefox` is called.`
 pub const FIREFOX_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.12; rv:53.0) \
 Gecko/20100101 Firefox/53.0";
 
+/// RestClient is used to configure request.
+///
+/// Together with the trait `RestClientMethods`, it provides a high level API
+/// interface that is somewhat similar to [unirest java library](http://unirest.io/java.html).
 pub struct RestClient {
     url: url::Url,
     request: Request,
@@ -140,26 +149,27 @@ pub struct RestClient {
 }
 
 impl RestClient {
+    /// Initialize a RestClient for a GET request.
     pub fn get(url: &str) -> Result<Self, Error> {
         RestClient::new(url, hyper::Method::Get)
     }
-
+    /// Initialize a RestClient for a DELETE request.
     pub fn delete(url: &str) -> Result<Self, Error> {
         RestClient::new(url, hyper::Method::Delete)
     }
-
+    /// Initialize a RestClient for a POST request.
     pub fn post(url: &str) -> Result<Self, Error> {
         RestClient::new(url, hyper::Method::Post)
     }
-
+    /// Initialize a RestClient for a PUT request.
     pub fn put(url: &str) -> Result<Self, Error> {
         RestClient::new(url, hyper::Method::Put)
     }
-
+    /// Initialize a RestClient for a PATCH request.
     pub fn patch(url: &str) -> Result<Self, Error> {
         RestClient::new(url, hyper::Method::Patch)
     }
-
+    /// Initialize a RestClient for a OPTIONS request.
     pub fn options(url: &str) -> Result<Self, Error> {
         RestClient::new(url, hyper::Method::Options)
     }
@@ -334,42 +344,87 @@ impl RestClient {
             },
         }
 
+        self.request
+            .headers_mut()
+            .set(AcceptCharset(vec![qitem(Charset::Ext("utf-8".to_string()))]));
+
+        self.request
+            .headers_mut()
+            .set(AcceptEncoding(vec![qitem(HyperEncoding::Gzip),
+                                     qitem(HyperEncoding::Deflate),
+                                     qitem(HyperEncoding::Chunked),
+                                     qitem(HyperEncoding::Identity)]));
+
         request_for_response(self.request, core)
     }
 }
 
+/// Provides a high level API that one can use to configure and execute a request.
 pub trait RestClientMethods {
+    /// Set cookie for request, can be called multiple times to set multiple cookies.
     fn cookie<K, V>(self, name: K, value: V) -> Self
         where K: Into<Cow<'static, str>>,
               V: Into<Cow<'static, str>>;
 
+    /// Set username and password for basic authentication header.
     fn authorization_basic(self, username: String, password: String) -> Self;
-
+    /// Set oauth token for oauth authentication.
     fn authorization_bearer(self, token: String) -> Self;
+    /// Set a custom authentication header.
     fn authorization_string(self, custom: String) -> Self;
+
+    /// Set Accept header for the request. If none is specified, the
+    /// default *application/json* will be used.
     fn accept(self, media_type: QualityItem<Mime>) -> Self;
 
+    /// Set a header with a raw string, existing value of the
+    /// same header will be overwritten.
     fn header_set_raw<K>(self, name: K, values: Vec<String>) -> Self
         where K: Into<Cow<'static, str>>;
+    /// Append a header with a raw string, existing value of the
+    /// same header will NOT be overwritten.
     fn header_append_raw<K>(self, name: K, value: String) -> Self
         where K: Into<Cow<'static, str>>;
 
+    /// Append url query parameters.
     fn query_param(self, name: &str, value: &str) -> Self;
 
+    /// Set form fields for the request. This method can be called
+    /// multiple times.  All fields will be encoded and send as
+    /// request body.
+    ///
+    /// Note: Content-Type will be set to *application/x-www-form-urlencoded*.
     fn form_field(self, name: &str, value: &str) -> Self;
+
+    /// Set request body as a json string.
+    ///
+    /// Note: Content-Type will be set to *application/json*.
     fn json_body_str(self, json_string: String) -> Self;
+    /// Parameter typed_value will be serialized into a json string and
+    /// sent as the request body.
+    ///
+    /// Note: Content-Type will be set to *application/json*.
     fn json_body_typed<T>(self, typed_value: &T) -> Self
         where T: serde::Serialize;
 
+    /// Set the user agent header for request.  If none is specified,
+    /// the default string `DEFAULT_USER_AGENT` will be used.
     fn user_agent<K>(self, agent: K) -> Self
         where K: Into<Cow<'static, str>>;
+    /// Set the user agent as firefox.  This may be needed when a server
+    /// only accepts requests from well-known user agents.
     fn user_agent_firefox(self) -> Self;
+    /// Set the user agent as chrome.
     fn user_agent_chrome(self) -> Self;
 
+    /// Finish setting up the request, and kick off request execution
+    /// on a `tokio_core::reactor::Core`.
     fn execute_on(self, core: &mut Core) -> Result<Response, Error>;
 }
 
-impl RestClientMethods for Result<RestClient, Error> {
+type RestClientResult = Result<RestClient, Error>;
+
+impl RestClientMethods for RestClientResult {
     fn cookie<K, V>(self, name: K, value: V) -> Self
         where K: Into<Cow<'static, str>>,
               V: Into<Cow<'static, str>> {
@@ -444,7 +499,7 @@ impl RestClientMethods for Result<RestClient, Error> {
     }
 }
 
-
+/// Holds the body content of a response.
 #[derive(Debug)]
 pub struct Content {
     content_string: String,
@@ -455,21 +510,27 @@ impl Content {
         Content { content_string: s }
     }
 
+    /// Get the raw body content as a `&str`.
     pub fn as_ref_string(&self) -> &str {
         &self.content_string
     }
 
+    /// Get the body content as a `serde_json::value::Value`.
     pub fn as_value(&self) -> Result<Value, Error> {
         serde_json::from_str(&self.content_string)
             .map_err(::std::convert::From::from)
     }
 
+    /// Get the body content as a strongly typed struct.
+    ///
+    /// The struct has to implement Serde's `Deserialize` trait.
     pub fn as_typed<T: DeserializeOwned>(&self) -> Result<T, Error> {
         serde_json::from_str(&self.content_string)
             .map_err(::std::convert::From::from)
     }
 }
 
+/// Holds response received from server after a request is executed.
 #[derive(Debug)]
 pub struct Response {
     status: StatusCode,
@@ -479,26 +540,34 @@ pub struct Response {
 }
 
 impl Response {
+    /// Get the response status code.
     pub fn status(&self) -> &StatusCode {
         &self.status
     }
-
+    /// Get the response body content.
     pub fn content(&self) -> &Content {
         &self.content
     }
-
+    /// Get response headers.
     pub fn headers(&self) -> &Headers {
         &self.headers
     }
 }
 
+/// The error that can happen during a request.
 #[derive(Debug)]
 pub enum Error {
+    /// Indicate an url parsing error.
     UrlParse(url::ParseError),
+    /// Also indicate an url parsing error.
     UriParse(hyper::error::UriError),
+    /// Error reported by hyper.
     Hyper(hyper::Error),
+    /// Response content cannot be decoded successfully.
     CharsetDecode,
+    /// IO error.
     Io(std::io::Error),
+    /// Error reported by serde_json.
     JsonError(serde_json::Error),
 }
 
@@ -569,24 +638,16 @@ impl From<serde_json::Error> for Error {
     }
 }
 
+/// This function provides a low level API interface that one can
+/// use if the high level API is not sufficient.
+///
+/// `RestClient` and `RestClientMethods` ony provide limited methods to
+/// customize a request. This function, on the other hand, gives users
+/// the complete control of how a request is configured.
 pub fn request_for_response(request: hyper::client::Request, core: &mut Core) -> Result<Response, Error> {
     let handle = core.handle();
 
     let connector = HttpsConnector::new(DNS_THREAD_COUNT, &handle);
-
-    let mut request = request;
-    request
-        .headers_mut()
-        .set(AcceptCharset(vec![qitem(Charset::Ext("utf-8".to_string()))]));
-
-    request
-        .headers_mut()
-        .set(AcceptEncoding(vec![qitem(HyperEncoding::Gzip),
-                                 qitem(HyperEncoding::Deflate),
-                                 qitem(HyperEncoding::Chunked),
-                                 qitem(HyperEncoding::Identity)]));
-
-    let request = request;
 
     let step1 = Client::configure()
                 .connector(connector)

@@ -40,7 +40,7 @@ fn main () {
 
  let original_typed = Address {
      street: "135 College View Ave.".to_owned(),
-     city: "Greenville".to_owned(),
+     city: "San Francisco".to_owned(),
  };
 
  let response = RestClient::post("http://mockbin.com/request")
