@@ -37,7 +37,11 @@
 //!         city: "San Francisco".to_owned(),
 //!     };
 //!
-//!     let response = RestClient::post("http://mockbin.com/request")
+//!     // Hit the local httpbin container in docker.
+//!     // Please see a similar example in repo readme
+//!     // (https://github.com/luanzhu/roadrunner) if you would like to try
+//!     // this example.
+//!     let response = RestClient::post("http://localhost:8000/post")
 //!         .cookie("food", "bar")
 //!         .authorization_bearer("QWxhZGRpbjpvcGVuIHNlc2FtZQ".to_string())
 //!         .json_body_typed(&original_typed)
@@ -50,9 +54,9 @@
 //!
 //!     let json_value = response.content().as_value().unwrap();
 //!     assert_eq!(Value::String("application/json".to_owned()),
-//!                 json_value["headers"]["content-type"]);
+//!                 json_value["headers"]["Content-Type"]);
 //!
-//!     let data_str = json_value["postData"]["text"].as_str().unwrap();
+//!     let data_str = json_value["data"].as_str().unwrap();
 //!
 //!     println!("data_str : {:?}", data_str);
 //!

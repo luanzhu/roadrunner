@@ -1,6 +1,6 @@
 # Roadrunner (RR)
 
-Roadrunner is a rust rest client based on [hyper project](https://github.com/hyperium/hyper) to 
+Roadrunner is a Rust Rest client based on [hyper project](https://github.com/hyperium/hyper) to 
 provide an user friendly interface for use.
 
 The API interface is partially inspired by [unirest java library](http://unirest.io/java.html).
@@ -75,14 +75,16 @@ fn main () {
 
 ## High level
 
-High level API access is provided through **RestClient** and methods available in trait
-**RestClientMethods**.
+High level API access is provided through [`RestClient`](https://luanzhu.github.io/rust/doc/roadrunner/struct.RestClient.html) and methods available in trait
+[`RestClientMethods`](https://luanzhu.github.io/rust/doc/roadrunner/trait.RestClientMethods.html).
 
 Please refer to tests in the tests folder for more example.
 
 ## Low level
 
-For more control of request settings, use **request_for_response**.  The high level RestClient is
+For more control of request configuration, please use [`request_for_response`](https://luanzhu.github.io/rust/doc/roadrunner/fn.request_for_response.html).  
+
+The high level [`RestClient`](https://luanzhu.github.io/rust/doc/roadrunner/struct.RestClient.html) is
 a thin layer on top of this function.
 
 # Supported Methods
@@ -96,19 +98,27 @@ a thin layer on top of this function.
 
 # Run integration tests in tests folder?
 
-All integration tests use httpbin to verify requests.  However, because of [a recent regression
-in httpbin](https://github.com/kennethreitz/httpbin/issues/340), httpbin cannot see the request
-body transferred in chunks.
+To make tests self-contained, all integration tests are hitting local httpbin container (behind 
+a nginx container) in docker.
 
-Before that bug is fixed or tests are migrated to mockbin, one has to run the **start.sh** in
-the docker-httpbin to start two containers (one for httpbin and another one for nginx) locally
-before you run any integration tests.
+Please run the `start.sh` in the `docker-httpbin` folder to start two containers (one for httpbin and another one for nginx) locally
+before you run integration tests.
+
+**Warning**: because of [a recent regression
+in httpbin](https://github.com/kennethreitz/httpbin/issues/340), httpbin.org cannot see the request
+body transferred in chunks.  Before the bug is fixed in httpbin, many tests will fail if they 
+hit httpbin.org directly.
 
 ## Add self-signed SSL cert into your CA
 
 Hyper client relies on [rust-native-tls]((https://github.com/sfackler/rust-native-tls) to
 handle https connections.  However, there is no easy option to allow self-signed certs yet.
 There is [an open issue regarding this](https://github.com/sfackler/rust-native-tls/issues/13).
+
+(Why not use a hosted version of https endpoint for tests?  You may ask.  Well, I personally 
+would like to see what takes to work around this invalid certificate problem. I think it is 
+fairly common to have self-signed certificates in testing environments. To me, this extra 
+step serves as an exercise when I use this rest client or hyper client in future projects.)
 
 As a result, the self-signed cert used in docker (docker-httpbin/config/localhost.cert) has to
 be set to trusted (or added to trusted CA store).  Otherwise, one test will fail.
