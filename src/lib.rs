@@ -109,24 +109,22 @@ use std::fmt;
 use std::borrow::Cow;
 use std::io::Read;
 use std::convert::From;
-use log::LogLevel;
 use hyper::Client;
 use hyper::status::StatusCode;
 use hyper::header::{Headers, AcceptEncoding, ContentEncoding, ContentType, Charset, AcceptCharset,
-                    qitem, q, Encoding as HyperEncoding, UserAgent, Cookie, QualityItem};
+                    qitem, Encoding as HyperEncoding, UserAgent, Cookie, QualityItem};
 use mime::Mime;
 use hyper::HttpVersion;
 use futures::Future;
 use futures::stream::Stream;
 use futures::future;
-use hyper::client::{Connect, Request};
+use hyper::client::Request;
 use hyper_tls::HttpsConnector;
 use serde_json::Value;
 use serde::de::DeserializeOwned;
-use tokio_core::reactor::{Handle, Core};
+use tokio_core::reactor::Core;
 
 use flate2::read::{GzDecoder, ZlibDecoder};
-use encoding::Encoding;
 
 const DNS_THREAD_COUNT: usize = 4;
 
@@ -426,9 +424,7 @@ pub trait RestClientMethods {
     fn execute_on(self, core: &mut Core) -> Result<Response, Error>;
 }
 
-type RestClientResult = Result<RestClient, Error>;
-
-impl RestClientMethods for RestClientResult {
+impl RestClientMethods for Result<RestClient, Error> {
     fn cookie<K, V>(self, name: K, value: V) -> Self
         where K: Into<Cow<'static, str>>,
               V: Into<Cow<'static, str>> {
@@ -448,7 +444,7 @@ impl RestClientMethods for RestClientResult {
         self.map(|client| { client.authorization_string(custom) })
     }
 
-    fn accept(mut self, media_type: QualityItem<Mime>) -> Self {
+    fn accept(self, media_type: QualityItem<Mime>) -> Self {
         self.map(|client| { client.accept(media_type) })
     }
 
@@ -651,6 +647,8 @@ impl From<serde_json::Error> for Error {
 pub fn request_for_response(request: hyper::client::Request, core: &mut Core) -> Result<Response, Error> {
     let handle = core.handle();
 
+    // no need to have a seperate http connector because the https connector
+    // can do both
     let connector = HttpsConnector::new(DNS_THREAD_COUNT, &handle);
 
     let step1 = Client::configure()
@@ -751,28 +749,14 @@ fn decompress_deflate(input: &[u8]) -> Result<Vec<u8>, Error> {
 }
 
 fn decode_to_string(chunks: Vec<u8>, content_type: Option<ContentType>) -> Result<String, Error> {
-    let decoder = match content_type {
-        Some(content_type_header) => {
-            match content_type_header.get_param(hyper::mime::Attr::Charset) {
-                Some(charset) => encoding::label::encoding_from_whatwg_label(charset),
-                None => None,
-            }
-        }
-        None => None,
-    };
-
-    match decoder {
-        Some(request_decoder) => {
-            request_decoder
-                .decode(&chunks, encoding::DecoderTrap::Strict)
-                .map_err(|_| Error::CharsetDecode)
-        }
-        None => {
-            encoding::all::UTF_8
-                .decode(&chunks, encoding::DecoderTrap::Strict)
-                .map_err(|_| Error::CharsetDecode)
-        }
-    }
+    content_type.as_ref()
+        .and_then(|content_type_header| {
+            content_type_header.get_param(hyper::mime::Attr::Charset) })
+        .and_then(|charset| {
+            encoding::label::encoding_from_whatwg_label(charset) })
+        .unwrap_or(encoding::all::UTF_8)
+        .decode(&chunks, encoding::DecoderTrap::Strict)
+        .map_err(|_| Error::CharsetDecode)
 }
 
 #[cfg(test)]
