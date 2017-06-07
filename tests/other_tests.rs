@@ -124,11 +124,10 @@ fn rest_client_options_test() {
     assert_eq!(*response.status(), StatusCode::Ok);
 
     let allow_methods = response.headers().get::<hyper::header::Allow>().unwrap().as_slice();
-    let mut iterator = allow_methods.iter();
-    assert_eq!(Some(&hyper::Method::Head), iterator.next());
-    assert_eq!(Some(&hyper::Method::Get), iterator.next());
-    assert_eq!(Some(&hyper::Method::Options), iterator.next());
-    assert_eq!(None, iterator.next());
+    let allow_set: std::collections::HashSet<&hyper::Method> = allow_methods.iter().collect();
+    assert!(allow_set.contains(&hyper::Method::Head));
+    assert!(allow_set.contains(&hyper::Method::Get));
+    assert!(allow_set.contains(&hyper::Method::Options));
 }
 
 #[test]
