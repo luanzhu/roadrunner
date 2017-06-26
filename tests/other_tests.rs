@@ -11,7 +11,7 @@ extern crate serde_derive;
 
 use roadrunner::RestClient;
 use roadrunner::RestClientMethods;
-use hyper::status::StatusCode;
+use hyper::StatusCode;
 use serde_json::Value;
 
 mod httpbin;

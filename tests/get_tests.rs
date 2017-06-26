@@ -12,7 +12,7 @@ extern crate serde_derive;
 
 use roadrunner::RestClient;
 use roadrunner::RestClientMethods;
-use hyper::status::StatusCode;
+use hyper::StatusCode;
 use serde_json::Value;
 
 use base64::encode;
@@ -216,7 +216,7 @@ fn rest_client_specified_accept_should_overwrite_json_test() {
     let mut core = tokio_core::reactor::Core::new().unwrap();
 
     let response = RestClient::get(&httpbin::to_full_http_url("/headers"))
-        .accept(hyper::header::qitem(mime::Mime(hyper::mime::TopLevel::Text, hyper::mime::SubLevel::Html, vec![])))
+        .accept(hyper::header::qitem(mime::TEXT_HTML))
         .execute_on(&mut core)
         .unwrap();
 
