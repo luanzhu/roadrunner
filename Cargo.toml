@@ -6,6 +6,7 @@ description = "A rust rest client based on hyper"
 repository = "https://github.com/luanzhu/roadrunner"
 keywords = ["rest", "client", "hyper"]
 categories = ["web-programming", "web-programming::http-client"]
+license = "MIT"
 
 [dependencies]
 hyper = "0.11"
