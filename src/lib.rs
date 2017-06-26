@@ -20,7 +20,7 @@
 //! use roadrunner::RestClient;
 //! use roadrunner::RestClientMethods;
 //!
-//! use hyper::status::StatusCode;
+//! use hyper::StatusCode;
 //! use serde_json::Value;
 //!
 //! #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -95,6 +95,7 @@ extern crate log;
 extern crate futures;
 extern crate hyper;
 extern crate hyper_tls;
+extern crate native_tls;
 extern crate tokio_core;
 extern crate serde_json;
 extern crate tokio_service;
@@ -110,7 +111,7 @@ use std::borrow::Cow;
 use std::io::Read;
 use std::convert::From;
 use hyper::Client;
-use hyper::status::StatusCode;
+use hyper::StatusCode;
 use hyper::header::{Headers, AcceptEncoding, ContentEncoding, ContentType, Charset, AcceptCharset,
                     qitem, Encoding as HyperEncoding, UserAgent, Cookie, QualityItem};
 use mime::Mime;
@@ -569,6 +570,8 @@ pub enum Error {
     Io(std::io::Error),
     /// Error reported by serde_json.
     JsonError(serde_json::Error),
+    /// native_tls error
+    NativeTlsError(native_tls::Error),
 }
 
 impl fmt::Display for Error {
@@ -580,6 +583,7 @@ impl fmt::Display for Error {
             Error::CharsetDecode => write!(f, "Character set decode error"),
             Error::Io(ref err) => write!(f, "Decompress IO error: {}", err),
             Error::JsonError(ref err) => write!(f, "Json error: {}", err),
+            Error::NativeTlsError(ref err) => write!(f, "native-tls error: {}", err),
         }
     }
 }
@@ -593,6 +597,7 @@ impl error::Error for Error {
             Error::CharsetDecode => "Character set decode error",
             Error::Io(ref err) => err.description(),
             Error::JsonError(ref err) => err.description(),
+            Error::NativeTlsError(ref err) => err.description(),
         }
     }
 
@@ -604,6 +609,7 @@ impl error::Error for Error {
             Error::CharsetDecode => None,
             Error::Io(ref err) => Some(err),
             Error::JsonError(ref err) => Some(err),
+            Error::NativeTlsError(ref err) => Some(err),
         }
     }
 }
@@ -638,6 +644,12 @@ impl From<serde_json::Error> for Error {
     }
 }
 
+impl From<native_tls::Error> for Error {
+    fn from(err: native_tls::Error) -> Error {
+        Error::NativeTlsError(err)
+    }
+}
+
 /// This function provides a low level API interface that one can
 /// use if the high level API is not sufficient.
 ///
@@ -649,7 +661,7 @@ pub fn request_for_response(request: hyper::client::Request, core: &mut Core) ->
 
     // no need to have a seperate http connector because the https connector
     // can do both
-    let connector = HttpsConnector::new(DNS_THREAD_COUNT, &handle);
+    let connector = HttpsConnector::new(DNS_THREAD_COUNT, &handle)?;
 
     let step1 = Client::configure()
                 .connector(connector)
@@ -750,10 +762,10 @@ fn decompress_deflate(input: &[u8]) -> Result<Vec<u8>, Error> {
 
 fn decode_to_string(chunks: Vec<u8>, content_type: Option<ContentType>) -> Result<String, Error> {
     content_type.as_ref()
-        .and_then(|content_type_header| {
-            content_type_header.get_param(hyper::mime::Attr::Charset) })
+        .and_then(|content_type_header| 
+            content_type_header.get_param(hyper::mime::CHARSET))
         .and_then(|charset| {
-            encoding::label::encoding_from_whatwg_label(charset) })
+            encoding::label::encoding_from_whatwg_label(charset.as_ref()) })
         .unwrap_or(encoding::all::UTF_8)
         .decode(&chunks, encoding::DecoderTrap::Strict)
         .map_err(|_| Error::CharsetDecode)
@@ -774,18 +786,15 @@ mod tests {
                        .unwrap());
         assert_eq!("Hello".to_string(),
                    decode_to_string(vec![72, 101, 108, 108, 111],
-                                    Some(ContentType(mime::Mime(mime::TopLevel::Text,
-                                                                mime::SubLevel::Html,
-                                                                vec![(mime::Attr::Charset,
-                                                                      mime::Value::Utf8)]))))
-                           .unwrap());
+                                    Some(ContentType(mime::TEXT_PLAIN_UTF_8)))
+                       .unwrap());
     }
 
     #[test]
     fn decode_to_string_test_iso_8859_1() {
         assert_eq!("caf\u{e9}".to_string(), decode_to_string(vec![99,97,102,233], 
-            Some(ContentType(mime::Mime(mime::TopLevel::Text, mime::SubLevel::Html,
-                vec![(mime::Attr::Charset, mime::Value::Ext("iso-8859-1".to_string()))])))).unwrap());
+            Some(ContentType("text/html; charset=iso-8859-1".parse::<mime::Mime>().unwrap())))
+            .unwrap());
     }
 
     #[test]
@@ -793,10 +802,7 @@ mod tests {
     fn decode_to_string_test_iso_8859_1_with_utf8_decode() {
         assert!("caf\u{e9}".to_string() !=
                 decode_to_string(vec![99, 97, 102, 233],
-                                 Some(ContentType(mime::Mime(mime::TopLevel::Text,
-                                                             mime::SubLevel::Html,
-                                                             vec![(mime::Attr::Charset,
-                                                                   mime::Value::Utf8)]))))
+                                 Some(ContentType("txt/html; charset=utf-8".parse::<mime::Mime>().unwrap())))
                         .unwrap());
     }
 
