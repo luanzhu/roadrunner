@@ -31,7 +31,7 @@ serde_json = "1.0"
 serde_derive="1.0"
 hyper = "0.11"
 
-roadrunner = { git="https://github.com/luanzhu/roadrunner", branch="update-to-hyper-0.11" }
+roadrunner = "0.1.1"
 ```
 
 Then copy to your main.rs:
